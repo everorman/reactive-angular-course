@@ -1,7 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-import { Observable } from 'rxjs';
-import { map, finalize } from 'rxjs/operators';
+import { Observable, throwError } from 'rxjs';
+import { map, finalize, catchError } from 'rxjs/operators';
 import { LoadingService } from '../loading/loading.service';
+import { MessagesService } from '../messages/messages.service';
 import { Course, sortCoursesBySeqNo } from '../model/course';
 import { CoursesService } from '../services/courses.service';
 
@@ -9,7 +10,7 @@ import { CoursesService } from '../services/courses.service';
 @Component({
   selector: 'home',
   templateUrl: './home.component.html',
-  styleUrls: ['./home.component.css']
+  styleUrls: ['./home.component.css'],
 })
 export class HomeComponent implements OnInit {
 
@@ -17,7 +18,7 @@ export class HomeComponent implements OnInit {
 
   advancedCourses$: Observable<Course[]>;
 
-  constructor(private coursesService: CoursesService, private loadingService: LoadingService) {
+  constructor(private coursesService: CoursesService, private messagesService: MessagesService, private loadingService: LoadingService) {
 
   }
 
@@ -28,7 +29,13 @@ export class HomeComponent implements OnInit {
   reloadCourses() {
 
     const courses$ = this.coursesService.loadAllCourses().pipe(
-      map(courses => courses.sort(sortCoursesBySeqNo))
+      map(courses => courses.sort(sortCoursesBySeqNo)),
+      catchError((err) => {
+        const message = "Could not load courses";
+        this.messagesService.showErrors(message);
+        console.log(err);
+        return throwError(err)
+      })
     );
 
     const loadCourses$ = this.loadingService.showLoaderUntilCompleted(courses$);
