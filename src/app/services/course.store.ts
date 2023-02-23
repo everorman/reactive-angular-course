@@ -1,7 +1,7 @@
 import { HttpClient } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { BehaviorSubject, Observable, throwError } from "rxjs";
-import { catchError, map, tap } from "rxjs/operators";
+import { catchError, map, shareReplay, tap } from "rxjs/operators";
 import { LoadingService } from "../loading/loading.service";
 import { MessagesService } from "../messages/messages.service";
 import { Course, sortCoursesBySeqNo } from "../model/course";
@@ -10,7 +10,7 @@ import { Course, sortCoursesBySeqNo } from "../model/course";
   providedIn: "root"
 })
 export class CoursesStore {
-  private subject = new BehaviorSubject<Course[]>([]);
+  private subject = new BehaviorSubject<Course[]>([]); // It can remembering the last value emitted 
   courses$: Observable<Course[]> = this.subject.asObservable();
 
   constructor(private http: HttpClient, private messages: MessagesService, private loading: LoadingService) {
@@ -32,7 +32,27 @@ export class CoursesStore {
       );
 
     this.loading.showLoaderUntilCompleted(loadCourses$).subscribe();
+  }
 
+  saveCourse(courseId: string, changes: Partial<Course>): Observable<any> {
+    const courses = this.subject.getValue(); // This return the course[] in memory 
+    const index = courses.findIndex(course => course.id === courseId);
+    const newCourse = {
+      ...courses[index],
+      ...changes
+    };
+    const newCourses: Course[] = courses.slice(0);
+    newCourses[index] = newCourse;
+    this.subject.next(newCourses);
+    return this.http.put(`/api/courses/${courseId}`, changes).pipe(
+      shareReplay(),
+      catchError((err) => {
+        const message = "Could not save course";
+        this.messages.showErrors(message);
+        console.log(err);
+        return throwError(err)
+      })
+    );
   }
 
   filterByCategory(category: string): Observable<Course[]> {
